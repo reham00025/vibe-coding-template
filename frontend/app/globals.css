@@ -23,7 +23,7 @@
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800;
   }
 
   .input {
