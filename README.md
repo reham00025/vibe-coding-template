@@ -1,10 +1,16 @@
-# Full Stack Vibe Coding Template
+# Reham AI - Next-Generation Vibe Coding Platform
 
-A modern, modular full-stack application starter template with NextJS frontend and Python FastAPI backend, supabase backend for Vibe coding.
+Reham AI is a next-generation Vibe Coding platform crafted to deliver a fully interactive, user-friendly experience for both novice and experienced builders. It pairs a modern dark-themed, responsive interface with a robust, scalable architecture that seamlessly integrates multiple LLM providers, all deployed on Cloudflare-backed infrastructure for reliability and performance.
 
-Contains all the common boilerplate features. Just add the README.md and CONTEXT.md files to AI coding agent's context.
+This repository provides the full-stack foundation for Reham AI, including a Next.js frontend, a FastAPI backend, Supabase integration for auth and data, and Qdrant for semantic search. It is designed for rapid, AI-assisted development while keeping production readiness in focus.
 
-Dont waste your time and tokens on boilerplate code. Use it to build your app
+## Product Vision
+
+- **Interactive Vibe Coding**: A guided, real-time environment where users can ideate, prototype, and ship with AI assistance.
+- **Modern dark aesthetic**: A sleek UI that is easy on the eyes and visually engaging.
+- **Responsive by default**: Optimized for desktop, tablet, and mobile experiences.
+- **Multi-LLM architecture**: Supports OpenAI and Anthropic today, with flexible expansion to additional providers.
+- **Cloudflare-first scalability**: Built to handle high volumes with consistent performance and low latency.
 
 ## 🤖 AI-Powered Development
 
@@ -64,7 +70,7 @@ This template includes comprehensive **Cursor Rules** and **Agent Instructions**
 - Python 3.10+ (for local backend development)
 - Supabase CLI (for database migrations, install with `brew install supabase/tap/supabase` or see [Supabase CLI docs](https://supabase.com/docs/guides/cli))
 
-### Quick Start
+### Quick Start (Recommended)
 
 1. Clone this repository:
    ```bash
@@ -90,6 +96,17 @@ This template includes comprehensive **Cursor Rules** and **Agent Instructions**
    - Frontend: http://localhost:3000
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
+
+### Required API Keys Checklist
+
+Use this checklist to make sure every capability is enabled:
+
+- [ ] **Supabase URL** (`SUPABASE_URL`) - required for auth and data access
+- [ ] **Supabase Service Role Key** (`SUPABASE_SERVICE_KEY`) - required for backend server operations
+- [ ] **OpenAI API Key** (`OPENAI_API_KEY`) - required for OpenAI-powered LLM features (optional if using Anthropic only)
+- [ ] **Anthropic API Key** (`ANTHROPIC_API_KEY`) - required for Claude-powered LLM features (optional if using OpenAI only)
+- [ ] **Qdrant URL** (`QDRANT_URL`) - required for vector search (optional if you don't need semantic search)
+- [ ] **Qdrant API Key** (`QDRANT_API_KEY`) - required when Qdrant authentication is enabled
 
 ## Setup Without Script
 
