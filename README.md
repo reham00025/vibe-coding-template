@@ -12,6 +12,19 @@ This repository provides the full-stack foundation for Reham AI, including a Nex
 - **Multi-LLM architecture**: Supports OpenAI and Anthropic today, with flexible expansion to additional providers.
 - **Cloudflare-first scalability**: Built to handle high volumes with consistent performance and low latency.
 
+## Experience Flow
+
+```mermaid
+graph TD
+    A[User Describes App] --> B[AI Agent Analyzes Request]
+    B --> C[Generate Blueprint & Plan]
+    C --> D[Phase-wise Code Generation]
+    D --> E[Live Preview in Container]
+    E --> F[User Feedback & Iteration]
+    F --> D
+    D --> G[Deploy to Workers for Platforms]
+```
+
 ## 🤖 AI-Powered Development
 
 This template includes comprehensive **Cursor Rules** and **Agent Instructions** to supercharge your AI-assisted development:
