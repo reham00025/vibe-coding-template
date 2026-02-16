@@ -7,98 +7,107 @@ import LoginForm from '@/components/auth/LoginForm';
 import { generateText } from '@/services/llm';
 import { getCurrentUser, signOut } from '@/services/supabase';
 
+type ActiveTab = 'home' | 'strategy' | 'studio' | 'queue';
+
 type StrategyDay = {
   day: string;
   platform: string;
-  content_angle: string;
-  asset_prompt: string;
-  posting_time: string;
+  contentAngle: string;
+  assetPrompt: string;
+  postingTime: string;
 };
 
 type CampaignStrategy = {
-  campaign_goal: string;
+  campaignGoal: string;
   days: StrategyDay[];
 };
 
 type Asset = {
   id: number;
   prompt: string;
-  url: string;
-  createdAt: string;
+  imageUrl: string;
 };
 
-type ScheduleItem = {
+type QueueItem = {
   id: number;
   platform: string;
   postingTime: string;
-  content: string;
-  mediaUrl: string;
+  caption: string;
   status: 'Scheduled';
 };
 
 const STORAGE_KEYS = {
-  strategy: 'marketing-agent:strategy',
-  assets: 'marketing-agent:assets',
-  queue: 'marketing-agent:queue',
+  strategy: 'mobile-agent:strategy',
+  assets: 'mobile-agent:assets',
+  queue: 'mobile-agent:queue',
 };
 
-function parseStrategy(rawText: string, campaignGoal: string): CampaignStrategy {
+function parseStrategy(raw: string, campaignGoal: string): CampaignStrategy {
   const fallback: CampaignStrategy = {
-    campaign_goal: campaignGoal,
+    campaignGoal,
     days: [
       {
         day: 'Day 1',
-        platform: 'LinkedIn',
-        content_angle: rawText,
-        asset_prompt: `Professional hero image for ${campaignGoal}`,
-        posting_time: '09:00',
+        platform: 'Instagram',
+        contentAngle: raw,
+        assetPrompt: `Mobile-first ad creative for ${campaignGoal}`,
+        postingTime: '10:00',
       },
     ],
   };
 
   try {
-    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonBlock = raw.match(/\{[\s\S]*\}/);
+    if (!jsonBlock) {
       return fallback;
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as Partial<CampaignStrategy>;
-    if (!parsed.days || !Array.isArray(parsed.days) || parsed.days.length === 0) {
+    const parsed = JSON.parse(jsonBlock[0]) as {
+      campaign_goal?: string;
+      days?: Array<{
+        day?: string;
+        platform?: string;
+        content_angle?: string;
+        asset_prompt?: string;
+        posting_time?: string;
+      }>;
+    };
+
+    if (!parsed.days?.length) {
       return fallback;
     }
 
-    const normalizedDays = parsed.days
-      .map((day, index) => ({
-        day: day.day || `Day ${index + 1}`,
-        platform: day.platform || 'LinkedIn',
-        content_angle: day.content_angle || 'Thought leadership post',
-        asset_prompt: day.asset_prompt || `Social media visual for ${campaignGoal}`,
-        posting_time: day.posting_time || '09:00',
-      }))
-      .slice(0, 3);
+    const days: StrategyDay[] = parsed.days.slice(0, 3).map((item, index) => ({
+      day: item.day || `Day ${index + 1}`,
+      platform: item.platform || 'Instagram',
+      contentAngle: item.content_angle || 'Feature highlight',
+      assetPrompt: item.asset_prompt || `Mobile social creative for ${campaignGoal}`,
+      postingTime: item.posting_time || '10:00',
+    }));
 
     return {
-      campaign_goal: parsed.campaign_goal || campaignGoal,
-      days: normalizedDays,
+      campaignGoal: parsed.campaign_goal || campaignGoal,
+      days,
     };
   } catch {
     return fallback;
   }
 }
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const [user, setUser] = useState<{ email?: string } | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'strategy' | 'studio' | 'calendar'>('dashboard');
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('home');
+
   const [campaignGoal, setCampaignGoal] = useState('');
   const [assetPrompt, setAssetPrompt] = useState('');
-  const [agentStatus, setAgentStatus] = useState('Idle');
-  const [loading, setLoading] = useState(false);
+  const [agentStatus, setAgentStatus] = useState('Ready');
+  const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [currentStrategy, setCurrentStrategy] = useState<CampaignStrategy | null>(null);
-  const [currentAssets, setCurrentAssets] = useState<Asset[]>([]);
-  const [scheduleQueue, setScheduleQueue] = useState<ScheduleItem[]>([]);
+  const [strategy, setStrategy] = useState<CampaignStrategy | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
 
   const router = useRouter();
 
@@ -108,9 +117,9 @@ export default function Dashboard() {
         const currentUser = await getCurrentUser();
         setUser(currentUser ? { email: currentUser.email } : null);
       } catch (loadError) {
-        console.error('Error loading user:', loadError);
+        console.error('Failed to load user:', loadError);
       } finally {
-        setIsLoadingUser(false);
+        setLoadingUser(false);
       }
     }
 
@@ -127,33 +136,91 @@ export default function Dashboard() {
     const savedQueue = localStorage.getItem(STORAGE_KEYS.queue);
 
     if (savedStrategy) {
-      setCurrentStrategy(JSON.parse(savedStrategy) as CampaignStrategy);
+      setStrategy(JSON.parse(savedStrategy) as CampaignStrategy);
     }
     if (savedAssets) {
-      setCurrentAssets(JSON.parse(savedAssets) as Asset[]);
+      setAssets(JSON.parse(savedAssets) as Asset[]);
     }
     if (savedQueue) {
-      setScheduleQueue(JSON.parse(savedQueue) as ScheduleItem[]);
+      setQueue(JSON.parse(savedQueue) as QueueItem[]);
     }
   }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.strategy, JSON.stringify(currentStrategy));
+      localStorage.setItem(STORAGE_KEYS.strategy, JSON.stringify(strategy));
+      localStorage.setItem(STORAGE_KEYS.assets, JSON.stringify(assets));
+      localStorage.setItem(STORAGE_KEYS.queue, JSON.stringify(queue));
     }
-  }, [currentStrategy]);
+  }, [strategy, assets, queue]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.assets, JSON.stringify(currentAssets));
+  const runStrategyAgent = async () => {
+    if (!campaignGoal.trim()) {
+      setError('Add your campaign goal first.');
+      return;
     }
-  }, [currentAssets]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.queue, JSON.stringify(scheduleQueue));
+    setError(null);
+    setIsWorking(true);
+    setAgentStatus('Planning campaign');
+
+    try {
+      const result = await generateText({
+        prompt: `Return strict JSON only with keys campaign_goal and days. days must include 3 items and each item must include day, platform, content_angle, asset_prompt, posting_time. Goal: ${campaignGoal}`,
+        provider: 'openai',
+        model: 'gpt-3.5-turbo',
+        temperature: 0.4,
+        max_tokens: 700,
+      });
+
+      const parsed = parseStrategy(result.text, campaignGoal);
+      setStrategy(parsed);
+      setAssetPrompt(parsed.days[0]?.assetPrompt || '');
+      setAgentStatus('Strategy ready');
+      setActiveTab('strategy');
+    } catch (strategyError: unknown) {
+      const message = strategyError instanceof Error ? strategyError.message : 'Failed to generate strategy.';
+      setError(message);
+      setAgentStatus('Strategy failed');
+    } finally {
+      setIsWorking(false);
     }
-  }, [scheduleQueue]);
+  };
+
+  const runCreativeAgent = async () => {
+    if (!assetPrompt.trim()) {
+      setError('Add an image prompt first.');
+      return;
+    }
+
+    setError(null);
+    setIsWorking(true);
+    setAgentStatus('Generating image');
+
+    try {
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(assetPrompt)}?width=1080&height=1350&nologo=true`;
+      const newAsset: Asset = { id: Date.now(), prompt: assetPrompt, imageUrl };
+      setAssets((prev) => [newAsset, ...prev]);
+      setAgentStatus('Image ready');
+      setActiveTab('studio');
+    } finally {
+      setIsWorking(false);
+    }
+  };
+
+  const addToQueue = (asset: Asset) => {
+    const newItem: QueueItem = {
+      id: Date.now(),
+      platform: 'Instagram',
+      postingTime: 'Tomorrow 10:00',
+      caption: `Launch post: ${asset.prompt}`,
+      status: 'Scheduled',
+    };
+
+    setQueue((prev) => [newItem, ...prev]);
+    setAgentStatus('Post queued');
+    setActiveTab('queue');
+  };
 
   const handleSignOut = async () => {
     try {
@@ -161,270 +228,188 @@ export default function Dashboard() {
       setUser(null);
       router.push('/');
     } catch (signOutError) {
-      console.error('Error signing out:', signOutError);
+      console.error('Failed to sign out:', signOutError);
     }
-  };
-
-  const runStrategyAgent = async () => {
-    if (!campaignGoal.trim()) {
-      setError('Please enter a campaign goal first.');
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-    setAgentStatus('Building campaign strategy...');
-
-    try {
-      const response = await generateText({
-        prompt: `You are an expert marketing strategist. Return strict JSON only with shape: {"campaign_goal": string, "days": [{"day": string, "platform": string, "content_angle": string, "asset_prompt": string, "posting_time": string}]}. Create exactly 3 day plans for this goal: ${campaignGoal}`,
-        provider: 'openai',
-        model: 'gpt-3.5-turbo',
-        max_tokens: 700,
-        temperature: 0.5,
-      });
-
-      const strategy = parseStrategy(response.text, campaignGoal);
-      setCurrentStrategy(strategy);
-      setAssetPrompt(strategy.days[0]?.asset_prompt || '');
-      setAgentStatus('Strategy ready');
-      setActiveTab('strategy');
-    } catch (strategyError: unknown) {
-      const message = strategyError instanceof Error ? strategyError.message : 'Failed to generate strategy.';
-      setError(message);
-      setAgentStatus('Strategy generation failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const runCreativeAgent = async () => {
-    if (!assetPrompt.trim()) {
-      setError('Please enter an asset prompt.');
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-    setAgentStatus('Generating creative asset...');
-
-    try {
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(assetPrompt)}?width=1024&height=1024&nologo=true`;
-
-      const newAsset: Asset = {
-        id: Date.now(),
-        prompt: assetPrompt,
-        url,
-        createdAt: new Date().toISOString(),
-      };
-
-      setCurrentAssets((prev) => [newAsset, ...prev]);
-      setAgentStatus('Asset generated');
-      setActiveTab('studio');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const addToQueue = (asset: Asset, platform: string, postingTime: string, content: string) => {
-    const newItem: ScheduleItem = {
-      id: Date.now(),
-      platform,
-      postingTime,
-      content,
-      mediaUrl: asset.url,
-      status: 'Scheduled',
-    };
-
-    setScheduleQueue((prev) => [newItem, ...prev]);
-    setAgentStatus(`Queued post for ${platform}`);
   };
 
   const stats = useMemo(
     () => ({
-      strategyDays: currentStrategy?.days.length ?? 0,
-      assets: currentAssets.length,
-      queued: scheduleQueue.length,
+      plans: strategy?.days.length ?? 0,
+      assets: assets.length,
+      queued: queue.length,
     }),
-    [currentStrategy, currentAssets.length, scheduleQueue.length],
+    [strategy, assets.length, queue.length],
   );
 
-  if (isLoadingUser) {
-    return <div className="p-8 text-center">Loading dashboard...</div>;
+  if (loadingUser) {
+    return <div className="p-8 text-center">Loading...</div>;
   }
 
   if (!user) {
     return (
-      <div className="max-w-md mx-auto p-8">
-        <h1 className="text-2xl font-bold mb-6 text-center">Sign In to Access Marketing Agent</h1>
+      <div className="max-w-md mx-auto p-6">
+        <h1 className="text-2xl font-bold text-center mb-5">Sign in to use Mobile Agent</h1>
         <LoginForm />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/70">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Marketing Agent Pro</h1>
-            <p className="text-xs text-slate-400">Autonomous planning with open integrations</p>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/" className="text-slate-300 hover:text-white">
-              Home
-            </Link>
-            <span className="text-slate-500">{user.email}</span>
-            <button onClick={handleSignOut} className="rounded bg-red-600 px-3 py-1.5 hover:bg-red-500">
+    <div className="min-h-screen bg-slate-950 text-slate-100 pb-20">
+      <main className="mx-auto w-full max-w-md px-4 pt-5 space-y-4">
+        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-indigo-300">Vercel-ready mobile UI</p>
+              <h1 className="text-xl font-bold">Marketing Agent</h1>
+            </div>
+            <button onClick={handleSignOut} className="rounded-md bg-red-600 px-2.5 py-1.5 text-xs">
               Sign Out
             </button>
           </div>
-        </div>
-      </header>
+          <p className="mt-2 text-xs text-slate-400 truncate">{user.email}</p>
+          <p className="mt-3 text-sm text-indigo-300">Status: {isWorking ? 'Working...' : agentStatus}</p>
+          {error && <p className="mt-2 rounded-md bg-red-950 px-3 py-2 text-xs text-red-200">{error}</p>}
+        </section>
 
-      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
-        <div className="grid md:grid-cols-4 gap-3">
-          {['dashboard', 'strategy', 'studio', 'calendar'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as 'dashboard' | 'strategy' | 'studio' | 'calendar')}
-              className={`rounded-lg px-4 py-2 capitalize border ${activeTab === tab ? 'bg-indigo-600 border-indigo-500' : 'bg-slate-900 border-slate-800 hover:bg-slate-800'}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm text-indigo-300">Status: {agentStatus}</div>
-
-        {error && <div className="rounded border border-red-400 bg-red-950 px-4 py-3 text-red-200">{error}</div>}
-
-        {activeTab === 'dashboard' && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-              <h2 className="text-2xl font-bold">Campaign Command Center</h2>
-              <p className="text-slate-400 text-sm">Describe your goal, generate a 3-day strategy, then create and queue assets.</p>
-              <input
+        {activeTab === 'home' && (
+          <section className="space-y-4">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+              <h2 className="font-semibold">1) Campaign Goal</h2>
+              <textarea
+                rows={3}
                 value={campaignGoal}
                 onChange={(event) => setCampaignGoal(event.target.value)}
-                placeholder="e.g. Increase trial signups for AI assistant in SMB market"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                placeholder="Increase free trial signups from mobile social channels"
               />
-              <div className="flex gap-3">
-                <button onClick={runStrategyAgent} disabled={loading} className="rounded bg-indigo-600 px-4 py-2 font-semibold hover:bg-indigo-500 disabled:opacity-50">
-                  {loading ? 'Working...' : 'Run Strategy Agent'}
-                </button>
-                <button onClick={runCreativeAgent} disabled={loading} className="rounded bg-purple-600 px-4 py-2 font-semibold hover:bg-purple-500 disabled:opacity-50">
-                  Generate Asset
-                </button>
-              </div>
+              <button onClick={runStrategyAgent} disabled={isWorking} className="w-full rounded-xl bg-indigo-600 py-2.5 text-sm font-semibold disabled:opacity-50">
+                Generate 3-Day Strategy
+              </button>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
-              <StatCard label="Strategy Days" value={String(stats.strategyDays)} />
-              <StatCard label="Assets" value={String(stats.assets)} />
-              <StatCard label="Queued Posts" value={String(stats.queued)} />
+            <div className="grid grid-cols-3 gap-2">
+              <MiniStat label="Plans" value={String(stats.plans)} />
+              <MiniStat label="Assets" value={String(stats.assets)} />
+              <MiniStat label="Queued" value={String(stats.queued)} />
             </div>
-          </div>
+          </section>
         )}
 
         {activeTab === 'strategy' && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-bold mb-4">Current Strategy</h2>
-            {!currentStrategy ? (
-              <p className="text-slate-400">No strategy yet. Generate one from the dashboard.</p>
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+            <h2 className="font-semibold">2) Strategy</h2>
+            {!strategy ? (
+              <p className="text-sm text-slate-400">No strategy yet.</p>
             ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-300">
-                  <span className="font-semibold">Goal:</span> {currentStrategy.campaign_goal}
-                </p>
-                <div className="grid gap-3">
-                  {currentStrategy.days.map((day) => (
-                    <div key={day.day} className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-sm space-y-1">
-                      <p className="font-semibold text-indigo-300">{day.day} • {day.platform}</p>
-                      <p><span className="text-slate-400">Angle:</span> {day.content_angle}</p>
-                      <p><span className="text-slate-400">Prompt:</span> {day.asset_prompt}</p>
-                      <p><span className="text-slate-400">Post Time:</span> {day.posting_time}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <>
+                <p className="text-xs text-slate-300">Goal: {strategy.campaignGoal}</p>
+                {strategy.days.map((item) => (
+                  <article key={`${item.day}-${item.platform}`} className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-1">
+                    <p className="font-semibold text-indigo-300">{item.day} · {item.platform}</p>
+                    <p><span className="text-slate-400">Angle:</span> {item.contentAngle}</p>
+                    <p><span className="text-slate-400">Prompt:</span> {item.assetPrompt}</p>
+                    <p><span className="text-slate-400">Time:</span> {item.postingTime}</p>
+                  </article>
+                ))}
+                <button onClick={() => setActiveTab('studio')} className="w-full rounded-xl bg-purple-600 py-2 text-sm font-semibold">
+                  Continue to Asset Studio
+                </button>
+              </>
             )}
-          </div>
+          </section>
         )}
 
         {activeTab === 'studio' && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 space-y-3">
-              <h2 className="text-xl font-bold">Asset Studio</h2>
+          <section className="space-y-3">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 space-y-3">
+              <h2 className="font-semibold">3) Asset Studio</h2>
               <textarea
+                rows={3}
                 value={assetPrompt}
                 onChange={(event) => setAssetPrompt(event.target.value)}
-                rows={3}
-                placeholder="High-end launch visual for AI workflow product"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3"
+                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+                placeholder="Cinematic social ad for AI assistant launch"
               />
-              <button onClick={runCreativeAgent} disabled={loading} className="rounded bg-purple-600 px-4 py-2 font-semibold hover:bg-purple-500 disabled:opacity-50">
-                {loading ? 'Generating...' : 'Generate Free-Tier Image'}
+              <button onClick={runCreativeAgent} disabled={isWorking} className="w-full rounded-xl bg-purple-600 py-2.5 text-sm font-semibold disabled:opacity-50">
+                Generate Free Image
               </button>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentAssets.map((asset) => (
-                <div key={asset.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3 space-y-3">
-                  <img src={asset.url} alt={asset.prompt} className="w-full aspect-square rounded object-cover" />
-                  <p className="text-xs text-slate-300 line-clamp-2">{asset.prompt}</p>
-                  <button
-                    onClick={() => addToQueue(asset, 'Instagram', 'Tomorrow 10:00', 'Launch teaser')}
-                    className="w-full rounded bg-emerald-600 py-2 text-sm font-semibold hover:bg-emerald-500"
-                  >
-                    Add to Queue
-                  </button>
-                </div>
-              ))}
-              {currentAssets.length === 0 && <p className="text-slate-500">No assets generated yet.</p>}
-            </div>
-          </div>
+
+            {assets.map((asset) => (
+              <article key={asset.id} className="rounded-2xl border border-slate-800 bg-slate-900 p-3 space-y-3">
+                <img src={asset.imageUrl} alt={asset.prompt} className="w-full rounded-xl aspect-[4/5] object-cover" />
+                <p className="text-xs text-slate-300">{asset.prompt}</p>
+                <button onClick={() => addToQueue(asset)} className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-semibold">
+                  Queue Post
+                </button>
+              </article>
+            ))}
+            {assets.length === 0 && <p className="text-center text-sm text-slate-500">No assets yet.</p>}
+          </section>
         )}
 
-        {activeTab === 'calendar' && (
-          <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-800 text-slate-300">
-                <tr>
-                  <th className="text-left px-4 py-3">Platform</th>
-                  <th className="text-left px-4 py-3">Time</th>
-                  <th className="text-left px-4 py-3">Content</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scheduleQueue.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-800">
-                    <td className="px-4 py-3">{item.platform}</td>
-                    <td className="px-4 py-3">{item.postingTime}</td>
-                    <td className="px-4 py-3">{item.content}</td>
-                    <td className="px-4 py-3 text-emerald-400">{item.status}</td>
-                  </tr>
-                ))}
-                {scheduleQueue.length === 0 && (
-                  <tr>
-                    <td className="px-4 py-6 text-slate-400" colSpan={4}>No scheduled posts yet.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        {activeTab === 'queue' && (
+          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <h2 className="font-semibold mb-3">4) Publishing Queue</h2>
+            <div className="space-y-2">
+              {queue.map((item) => (
+                <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs space-y-1">
+                  <p className="font-semibold text-indigo-300">{item.platform} · {item.status}</p>
+                  <p><span className="text-slate-400">Time:</span> {item.postingTime}</p>
+                  <p><span className="text-slate-400">Caption:</span> {item.caption}</p>
+                </article>
+              ))}
+            </div>
+            {queue.length === 0 && <p className="text-sm text-slate-500">No scheduled posts yet.</p>}
+          </section>
         )}
+
+        <div className="pt-1 text-center">
+          <Link href="/" className="text-xs text-slate-500 underline">
+            Back to home
+          </Link>
+        </div>
       </main>
+
+      <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-800 bg-slate-950/95 backdrop-blur">
+        <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-1 p-2">
+          <TabButton label="Home" tab="home" activeTab={activeTab} onClick={setActiveTab} />
+          <TabButton label="Plan" tab="strategy" activeTab={activeTab} onClick={setActiveTab} />
+          <TabButton label="Studio" tab="studio" activeTab={activeTab} onClick={setActiveTab} />
+          <TabButton label="Queue" tab="queue" activeTab={activeTab} onClick={setActiveTab} />
+        </div>
+      </nav>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-      <p className="text-3xl font-bold">{value}</p>
-      <p className="text-xs uppercase tracking-wider text-slate-400">{label}</p>
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-3 text-center">
+      <p className="text-lg font-bold">{value}</p>
+      <p className="text-[10px] uppercase tracking-wide text-slate-400">{label}</p>
     </div>
+  );
+}
+
+function TabButton({
+  label,
+  tab,
+  activeTab,
+  onClick,
+}: {
+  label: string;
+  tab: ActiveTab;
+  activeTab: ActiveTab;
+  onClick: (tab: ActiveTab) => void;
+}) {
+  return (
+    <button
+      onClick={() => onClick(tab)}
+      className={`rounded-lg py-2 text-xs font-semibold ${activeTab === tab ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300'}`}
+    >
+      {label}
+    </button>
   );
 }
