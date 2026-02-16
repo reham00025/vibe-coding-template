@@ -16,26 +16,26 @@ export default function LoginForm() {
   const handleGoogleSignIn = async () => {
     try {
       setError(null);
-      setIsLoading({ ...isLoading, google: true });
+      setIsLoading((prev) => ({ ...prev, google: true }));
       const { error } = await signInWithGoogle();
       if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google');
     } finally {
-      setIsLoading({ ...isLoading, google: false });
+      setIsLoading((prev) => ({ ...prev, google: false }));
     }
   };
 
   const handleLinkedInSignIn = async () => {
     try {
       setError(null);
-      setIsLoading({ ...isLoading, linkedin: true });
+      setIsLoading((prev) => ({ ...prev, linkedin: true }));
       const { error } = await signInWithLinkedIn();
       if (error) throw error;
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with LinkedIn');
     } finally {
-      setIsLoading({ ...isLoading, linkedin: false });
+      setIsLoading((prev) => ({ ...prev, linkedin: false }));
     }
   };
 
@@ -44,7 +44,7 @@ export default function LoginForm() {
     try {
       setError(null);
       setSuccess(null);
-      setIsLoading({ ...isLoading, email: true });
+      setIsLoading((prev) => ({ ...prev, email: true }));
 
       if (mode === 'signin') {
         const { error } = await signInWithEmail(email, password);
@@ -61,7 +61,7 @@ export default function LoginForm() {
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     } finally {
-      setIsLoading({ ...isLoading, email: false });
+      setIsLoading((prev) => ({ ...prev, email: false }));
     }
   };
 
@@ -116,7 +116,7 @@ export default function LoginForm() {
               name="password"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              required={mode !== 'reset'}
+              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
