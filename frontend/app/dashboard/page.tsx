@@ -365,10 +365,17 @@ export default function DashboardPage() {
           </section>
         )}
 
-        <div className="pt-1 text-center">
-          <Link href="/" className="text-xs text-slate-500 underline">
-            Back to home
-          </Link>
+        <div className="pt-1 text-center space-y-1">
+          <div>
+            <Link href="/preview" className="text-xs text-indigo-300 underline">
+              Open interactive HTML preview
+            </Link>
+          </div>
+          <div>
+            <Link href="/" className="text-xs text-slate-500 underline">
+              Back to home
+            </Link>
+          </div>
         </div>
       </main>
 
