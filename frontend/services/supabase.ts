@@ -1,16 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize the Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const fallbackSupabaseUrl = 'https://example.supabase.co';
+const fallbackSupabaseAnonKey = 'public-anon-key';
 
-if (!supabaseUrl || !supabaseAnonKey) {
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || fallbackSupabaseUrl;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || fallbackSupabaseAnonKey;
+
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
   console.warn('Missing Supabase environment variables. Authentication might not work correctly.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Authentication helpers
 export async function signInWithGoogle() {
   return supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -29,7 +30,6 @@ export async function signInWithLinkedIn() {
   });
 }
 
-// Email password authentication
 export async function signInWithEmail(email: string, password: string) {
   return supabase.auth.signInWithPassword({
     email,
@@ -58,13 +58,14 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return user;
 }
 
-// Session management
 export function onAuthStateChange(callback: (event: 'SIGNED_IN' | 'SIGNED_OUT' | 'USER_UPDATED', session: any) => void) {
   return supabase.auth.onAuthStateChange((event, session) => {
-    callback(event as any, session);
+    callback(event as 'SIGNED_IN' | 'SIGNED_OUT' | 'USER_UPDATED', session);
   });
 }
